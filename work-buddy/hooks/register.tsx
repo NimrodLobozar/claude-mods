@@ -9,8 +9,10 @@ import { svg } from './vector'
 const RESTING_AFTER_MS = 2 * 60 * 1000
 /** One animation step in the terminal. */
 const STEP_MS = 350
-/** work-buddy's own pane, opened where usage-timer is not loaded. */
+/** work-buddy's own pane, for surfaces without the band (or /work-buddy). */
 const OWN_PANE = 'work-buddy'
+/** Surfaces that draw the AbovePrompt band. */
+const HAS_BAND: readonly string[] = ['terminal', 'desktop']
 
 const activity = atom(
   { plugin: 'work-buddy', key: 'activity' } as const,
@@ -46,12 +48,11 @@ export const register: Register = on => {
     // Animation and the waiting → resting change both need the clock.
     $.clock.every(STEP_MS, () => $.ui.invalidate('ui.render'))
     await $.command.register({ name: 'work-buddy', description: 'Open the work buddy pane' })
-    // Without usage-timer's pane to draw on, open a pane of its own; wait a
-    // moment so usage-timer has registered its command if it is loaded.
-    $.clock.after(2000, () => {
-      void $.command.list().then(list => {
-        if (!list.some(c => c.name === 'usage-timer'))
-          void $.ui.open({ id: OWN_PANE, title: 'Work buddy' })
+    // The band above the prompt is drawn on the terminal and desktop only;
+    // where a surface has no band (VS Code, mobile), open a pane instead.
+    $.clock.after(1500, () => {
+      void $.session.surfaces().then(list => {
+        if (list.some(s => !HAS_BAND.includes(s))) void $.ui.open({ id: OWN_PANE, title: 'Work buddy' })
       })
     })
     return next(e)
@@ -92,29 +93,22 @@ export const register: Register = on => {
     return { text: "Work buddy pane opened." }
   })
 
-  on(
-    "ui.render",
-    // The usage-timer mod's pane: work-buddy draws on top of it.
-    { component: "Pane", requestId: "usage-timer", plugin: "usage-timer" },
-    async ($, matched, next) => {
-      // The types narrow a matcher naming another plugin to nothing; it is that plugin's Pane.
-      const e = matched as unknown as RenderInput<"Pane">
-      const below = await next(matched)
-      const { Box } = $.ui.resolve(e)
-      return (
-        <Box flexDirection="column" gap={1}>
-          {await buddy($, e)}
-          {below}
-        </Box>
-      )
-    },
-  )
+  on("session.attach", async ($, e, next) => {
+    if (!HAS_BAND.includes(e.surface)) void $.ui.open({ id: OWN_PANE, title: "Work buddy" })
+    return next(e)
+  })
 
-  // Its own pane, for a session without usage-timer (or /work-buddy).
-  on("ui.render", { component: "Pane", requestId: OWN_PANE }, async ($, e) => buddy($, e))
+  // The band directly above the prompt: always drawn, at any width.
+  on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+    return buddy($, e, true)
+  })
+
+  // Its own pane: VS Code and mobile, which have no band, or /work-buddy.
+  on("ui.render", { component: "Pane", requestId: OWN_PANE }, async ($, e) => buddy($, e, false))
 }
 
-async function buddy($: EngineInterface, e: RenderInput<"Pane">) {
+async function buddy($: EngineInterface, e: RenderInput<"Pane" | "AbovePrompt">, isSmall: boolean) {
   const [a, now] = await Promise.all([read($, activity), $.clock.now()])
   const idle = a.mode === "waiting" && !a.needsYou && now - a.since > RESTING_AFTER_MS
   const mode: BuddyMode = idle ? "resting" : a.mode
@@ -139,7 +133,7 @@ async function buddy($: EngineInterface, e: RenderInput<"Pane">) {
     art = <Raster key="buddy" columns={COLUMNS} rows={ROWS} cells={cells(mode, t)} />
   } else {
     const { Svg } = $.ui.resolve(e)
-    art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={136} height={100} />
+    art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={isSmall ? 82 : 136} height={isSmall ? 60 : 100} />
   }
 
   return (

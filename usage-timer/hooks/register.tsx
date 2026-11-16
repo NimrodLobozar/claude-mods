@@ -46,6 +46,14 @@ export const register: Register = on => {
     return { text: 'Usage & timer pane opened.' }
   })
 
+  // A pane opened unasked waits for a wide terminal (144 columns); one opened
+  // behind the person's own prompt is placed at any width.
+  on('prompt.submit', async ($, e, next) => {
+    const pane = (await $.ui.panes()).find(p => p.id === PANE)
+    if (!pane?.isPlaced) void $.ui.open({ id: PANE, title: TITLE })
+    return next(e)
+  })
+
   on('turn.start', async ($, e, next) => {
     if (e.agentId === undefined) {
       const now = await $.clock.now()
