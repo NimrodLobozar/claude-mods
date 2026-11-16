@@ -1,0 +1,1 @@
+{ "name": "usage-timer", "version": "0.1.0", "description": "Side pane with session/turn timers, context window fill and cost", "types": "./types/index.d.ts" }

@@ -1,0 +1,11 @@
+{
+  "name": "claude-mods",
+  "owner": { "name": "NimrodLobozar" },
+  "plugins": [
+    {
+      "name": "usage-timer",
+      "source": "./usage-timer",
+      "description": "Side pane with session/turn timers, context window fill, cost and rate limits"
+    }
+  ]
+}
