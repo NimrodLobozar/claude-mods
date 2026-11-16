@@ -34,6 +34,15 @@ In the desktop app, where `/plugin` does not run: click + next to the prompt box
 
 This repository is private: the machine you install on needs a git credential for github.com that can read it, for example `gh auth login` followed by `gh auth setup-git`. The install never prompts for one.
 
+## Changing work-buddy's art
+
+The pictures are `work-buddy/art/claude-working.svg`, `claude-waiting.svg` and `claude-sleeping.svg` (resting). Each is an SVG wrapping one PNG, with a CSS animation on the `.mascot` class. After replacing them, rebuild `work-buddy/hooks/art.ts` (a shrunken copy for the desktop app, and pixels for the terminal):
+
+```bash
+npm install --no-save sharp
+node work-buddy/art/build.cjs
+```
+
 ## Adding a mod
 
 Put the mod in its own folder (`<mod>/.claude-plugin/plugin.json`, `<mod>/hooks/...`) and add an entry to `.claude-plugin/marketplace.json` with `"source": "./<mod>"`.

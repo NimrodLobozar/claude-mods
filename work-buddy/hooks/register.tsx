@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { Register, EngineInterface, RenderInput } from 'claude-code'
 
 import type { Activity, BuddyMode } from '../types'
-import { cells, COLUMNS, ROWS } from './pixel'
-import { svg } from './vector'
+import { cells, columnsFor } from './pixel'
+import { aspect, svg } from './vector'
 
 /** Waiting this long with nobody needed turns into resting. */
 const RESTING_AFTER_MS = 2 * 60 * 1000
@@ -44,7 +44,8 @@ function ago(ms: number): string {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await set($, { mode: 'resting', detail: null, needsYou: false })
+    const startedAt = await $.clock.now()
+    await update($, activity, (): Activity => ({ mode: 'resting', since: startedAt, detail: null, needsYou: false }))
     // Animation and the waiting → resting change both need the clock.
     $.clock.every(STEP_MS, () => $.ui.invalidate('ui.render'))
     await $.command.register({ name: 'work-buddy', description: 'Open the work buddy pane' })
@@ -118,9 +119,11 @@ async function buddy($: EngineInterface, e: RenderInput<"Pane" | "AbovePrompt">,
   const { Box, Text } = $.ui.resolve(e)
   const words = (
     <Box flexDirection="column">
-      <Text bold color={look.color}>
-        {look.icon} {look.label}
-      </Text>
+      {e.surface === "terminal" && (
+        <Text bold color={look.color}>
+          {look.icon} {look.label}
+        </Text>
+      )}
       {detail !== null && <Text dimColor>{detail}</Text>}
       <Text dimColor>for {ago(now - a.since)}</Text>
     </Box>
@@ -130,10 +133,13 @@ async function buddy($: EngineInterface, e: RenderInput<"Pane" | "AbovePrompt">,
   if (e.surface === "terminal") {
     const { Raster } = $.ui.resolve(e)
     const t = Math.floor(now / STEP_MS)
-    art = <Raster key="buddy" columns={COLUMNS} rows={ROWS} cells={cells(mode, t)} />
+    // The band gives what rows the screen has left; a pane has room for more.
+    const room = e.component === "AbovePrompt" ? e.props.maxRows : 8
+    const rows = Math.max(5, Math.min(8, room)) // under 5 rows the picture is a blob
+    art = <Raster key="buddy" columns={columnsFor(mode, rows)} rows={rows} cells={cells(mode, rows, t)} />
   } else {
     const { Svg } = $.ui.resolve(e)
-    art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={isSmall ? 82 : 136} height={isSmall ? 60 : 100} />
+    art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={Math.round((isSmall ? 110 : 200) * aspect(mode))} height={isSmall ? 110 : 200} />
   }
 
   return (
