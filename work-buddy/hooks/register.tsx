@@ -9,6 +9,8 @@ import { svg } from './vector'
 const RESTING_AFTER_MS = 2 * 60 * 1000
 /** One animation step in the terminal. */
 const STEP_MS = 350
+/** work-buddy's own pane, opened where usage-timer is not loaded. */
+const OWN_PANE = 'work-buddy'
 
 const activity = atom(
   { plugin: 'work-buddy', key: 'activity' } as const,
@@ -43,6 +45,15 @@ export const register: Register = on => {
     await set($, { mode: 'resting', detail: null, needsYou: false })
     // Animation and the waiting → resting change both need the clock.
     $.clock.every(STEP_MS, () => $.ui.invalidate('ui.render'))
+    await $.command.register({ name: 'work-buddy', description: 'Open the work buddy pane' })
+    // Without usage-timer's pane to draw on, open a pane of its own; wait a
+    // moment so usage-timer has registered its command if it is loaded.
+    $.clock.after(2000, () => {
+      void $.command.list().then(list => {
+        if (!list.some(c => c.name === 'usage-timer'))
+          void $.ui.open({ id: OWN_PANE, title: 'Work buddy' })
+      })
+    })
     return next(e)
   })
 
@@ -76,50 +87,65 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on("command.run", { command: "work-buddy" }, async $ => {
+    await $.ui.open({ id: OWN_PANE, title: "Work buddy" })
+    return { text: "Work buddy pane opened." }
+  })
+
   on(
-    'ui.render',
+    "ui.render",
     // The usage-timer mod's pane: work-buddy draws on top of it.
-    { component: 'Pane', requestId: 'usage-timer', plugin: 'usage-timer' },
+    { component: "Pane", requestId: "usage-timer", plugin: "usage-timer" },
     async ($, matched, next) => {
       // The types narrow a matcher naming another plugin to nothing; it is that plugin's Pane.
-      const e = matched as unknown as RenderInput<'Pane'>
+      const e = matched as unknown as RenderInput<"Pane">
       const below = await next(matched)
-      const [a, now] = await Promise.all([read($, activity), $.clock.now()])
-      const idle = a.mode === 'waiting' && !a.needsYou && now - a.since > RESTING_AFTER_MS
-      const mode: BuddyMode = idle ? 'resting' : a.mode
-      const look = LOOK[mode]
-      const detail = idle ? null : a.detail
-
-      const { Box, Text } = $.ui.resolve(e)
-      const words = (
-        <Box flexDirection="column">
-          <Text bold color={look.color}>
-            {look.icon} {look.label}
-          </Text>
-          {detail !== null && <Text dimColor>{detail}</Text>}
-          <Text dimColor>for {ago(now - a.since)}</Text>
-        </Box>
-      )
-
-      let art
-      if (e.surface === "terminal") {
-        const { Raster } = $.ui.resolve(e)
-        const t = Math.floor(now / STEP_MS)
-        art = <Raster key="buddy" columns={COLUMNS} rows={ROWS} cells={cells(mode, t)} />
-      } else {
-        const { Svg } = $.ui.resolve(e)
-        art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={136} height={100} />
-      }
-
+      const { Box } = $.ui.resolve(e)
       return (
         <Box flexDirection="column" gap={1}>
-          <Box flexDirection="row" gap={2}>
-            {art}
-            {words}
-          </Box>
+          {await buddy($, e)}
           {below}
         </Box>
       )
     },
+  )
+
+  // Its own pane, for a session without usage-timer (or /work-buddy).
+  on("ui.render", { component: "Pane", requestId: OWN_PANE }, async ($, e) => buddy($, e))
+}
+
+async function buddy($: EngineInterface, e: RenderInput<"Pane">) {
+  const [a, now] = await Promise.all([read($, activity), $.clock.now()])
+  const idle = a.mode === "waiting" && !a.needsYou && now - a.since > RESTING_AFTER_MS
+  const mode: BuddyMode = idle ? "resting" : a.mode
+  const look = LOOK[mode]
+  const detail = idle ? null : a.detail
+
+  const { Box, Text } = $.ui.resolve(e)
+  const words = (
+    <Box flexDirection="column">
+      <Text bold color={look.color}>
+        {look.icon} {look.label}
+      </Text>
+      {detail !== null && <Text dimColor>{detail}</Text>}
+      <Text dimColor>for {ago(now - a.since)}</Text>
+    </Box>
+  )
+
+  let art
+  if (e.surface === "terminal") {
+    const { Raster } = $.ui.resolve(e)
+    const t = Math.floor(now / STEP_MS)
+    art = <Raster key="buddy" columns={COLUMNS} rows={ROWS} cells={cells(mode, t)} />
+  } else {
+    const { Svg } = $.ui.resolve(e)
+    art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={136} height={100} />
+  }
+
+  return (
+    <Box flexDirection="row" gap={2}>
+      {art}
+      {words}
+    </Box>
   )
 }

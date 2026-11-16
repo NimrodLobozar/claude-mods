@@ -7,7 +7,7 @@ My own mods for Claude Code. Each folder is one mod; `.claude-plugin/marketplace
 | Mod | What it does |
 | --- | --- |
 | [usage-timer](usage-timer) | A side pane with a session timer, a live timer for the running turn, the context window's fill (bar, tokens used and left), the session's cost and rate-limit usage. Opens at session start; `/usage-timer` reopens it. |
-| [work-buddy](work-buddy) | An animated character at the top of the usage-timer pane: ⚙ working (thinking or running a tool), ⏳ waiting (a permission prompt, a question, or your reply) and 💤 resting (idle for 2 minutes). Vector art (SVG) in the desktop app, VS Code and mobile; pixel art in the terminal. Needs usage-timer. |
+| [work-buddy](work-buddy) | An animated character at the top of the usage-timer pane: ⚙ working (thinking or running a tool), ⏳ waiting (a permission prompt, a question, or your reply) and 💤 resting (idle for 2 minutes). Vector art (SVG) in the desktop app, VS Code and mobile; pixel art in the terminal. Draws on top of the usage-timer pane when that mod is loaded; otherwise opens its own pane (`/work-buddy` reopens it). |
 
 ## Install
 
