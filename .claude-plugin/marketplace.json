@@ -6,6 +6,11 @@
       "name": "usage-timer",
       "source": "./usage-timer",
       "description": "Side pane with session/turn timers, context window fill, cost and rate limits"
+    },
+    {
+      "name": "work-buddy",
+      "source": "./work-buddy",
+      "description": "An animated character in the usage-timer pane that shows whether Claude is working, waiting or resting"
     }
   ]
 }
