@@ -1,1 +1,1 @@
-{ "name": "work-buddy", "version": "0.4.0", "description": "An animated Claude character in the usage-timer pane that shows whether Claude is working, waiting or resting", "types": "./types/index.d.ts" }
+{ "name": "work-buddy", "version": "0.8.0", "description": "An animated Claude character in the usage-timer pane that shows whether Claude is working, waiting or resting", "types": "./types/index.d.ts" }

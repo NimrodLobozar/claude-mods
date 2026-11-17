@@ -36,7 +36,20 @@ This repository is private: the machine you install on needs a git credential fo
 
 ## Changing work-buddy's art
 
-The pictures are `work-buddy/art/claude-working.svg`, `claude-waiting.svg` and `claude-sleeping.svg` (resting). Each is an SVG wrapping one PNG, with a CSS animation on the `.mascot` class. After replacing them, rebuild `work-buddy/hooks/art.ts` (a shrunken copy for the desktop app, and pixels for the terminal):
+The pictures are `work-buddy/art/claude-working.svg`, `claude-waiting.svg` and `claude-sleeping.svg` (resting), each an SVG wrapping one PNG; `work-buddy/art/parts-sheet.webp` is the sheet of separate parts they were drawn from.
+
+In the desktop app, VS Code and mobile each pose is animated part by part: the PNG is cut into layers (body, hair, hands, eyes, the laptop's stripes and glow, the speech bubble and its dots, the Z's) and each layer moves on its own, with no bounce and no status pill. Three Python scripts do the cutting and write `work-buddy/hooks/working-art.ts`, `waiting-art.ts` and `sleeping-art.ts`:
+
+```bash
+pip install pillow numpy scipy
+python work-buddy/art/build-working.py
+python work-buddy/art/build-waiting.py
+python work-buddy/art/build-sleeping.py
+```
+
+The desktop app restarts the picture about once a second while usage-timer's pane ticks, so every steady motion repeats exactly every second (a restart then lands on the same frame). An occasional moment, such as a blink, starts after a few still seconds, so it never shows while those restarts happen and nothing jumps.
+
+The terminal's pixel art (and the fallback for the desktop) comes from `work-buddy/hooks/art.ts`; rebuild it after replacing the pictures:
 
 ```bash
 npm install --no-save sharp

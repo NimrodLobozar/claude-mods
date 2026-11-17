@@ -59,8 +59,7 @@ export function cells(mode: BuddyMode, rows: number, t: number): string {
   const columns = columnsFor(mode, rows)
   const h = rows * 2
   const picture = scale(source(mode), columns, h - 1)
-  const period = mode === 'working' ? 1 : mode === 'waiting' ? 3 : 5
-  const dy = Math.floor(t / period) % 2
+  const dy = 0 // the character holds still in every mode: no bounce
   const at = (x: number, y: number) => {
     const sy = y - dy
     return sy < 0 || sy >= h - 1 ? DEFAULT : picture[sy * columns + x]!

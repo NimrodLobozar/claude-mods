@@ -35,6 +35,23 @@ const LOOK: Record<BuddyMode, { icon: string; label: string; color: string }> = 
   resting: { icon: '💤', label: 'Resting', color: 'subtle' },
 }
 
+/** What the buddy shows at `now`: waiting long enough with nobody needed is resting. */
+function shown(a: Activity, now: number): { mode: BuddyMode; detail: string | null } {
+  const idle = a.mode === 'waiting' && !a.needsYou && now - a.since > RESTING_AFTER_MS
+  return idle ? { mode: 'resting', detail: null } : { mode: a.mode, detail: a.detail }
+}
+
+/**
+ * The time in a mode as the desktop, VS Code and mobile show it: whole minutes,
+ * so their text changes at most once a minute and the picture, which animates
+ * itself, is not redrawn (and restarted) every second.
+ */
+function roughly(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000))
+  if (m < 1) return '<1m'
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`
+}
+
 function ago(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000))
   if (s < 60) return `${s}s`
@@ -46,8 +63,21 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const startedAt = await $.clock.now()
     await update($, activity, (): Activity => ({ mode: 'resting', since: startedAt, detail: null, needsYou: false }))
-    // Animation and the waiting → resting change both need the clock.
-    $.clock.every(STEP_MS, () => $.ui.invalidate('ui.render'))
+    // The terminal's pixel art and seconds timer are redrawn by the module at
+    // every step. Elsewhere the picture animates itself, and a redraw can jump
+    // it: redraw only when what those surfaces show changes (the waiting →
+    // resting change or the minutes), which a change of activity does by itself.
+    let shownKey = ''
+    $.clock.every(STEP_MS, () => {
+      void Promise.all([$.session.surfaces(), read($, activity), $.clock.now()]).then(([list, a, now]) => {
+        if (list.includes('terminal')) return $.ui.invalidate('ui.render')
+        const s = shown(a, now)
+        const key = `${s.mode}|${roughly(now - a.since)}`
+        if (key === shownKey) return
+        shownKey = key
+        $.ui.invalidate('ui.render')
+      })
+    })
     await $.command.register({ name: 'work-buddy', description: 'Open the work buddy pane' })
     // The band above the prompt is drawn on the terminal and desktop only;
     // where a surface has no band (VS Code, mobile), open a pane instead.
@@ -111,10 +141,8 @@ export const register: Register = on => {
 
 async function buddy($: EngineInterface, e: RenderInput<"Pane" | "AbovePrompt">, isSmall: boolean) {
   const [a, now] = await Promise.all([read($, activity), $.clock.now()])
-  const idle = a.mode === "waiting" && !a.needsYou && now - a.since > RESTING_AFTER_MS
-  const mode: BuddyMode = idle ? "resting" : a.mode
+  const { mode, detail } = shown(a, now)
   const look = LOOK[mode]
-  const detail = idle ? null : a.detail
 
   const { Box, Text } = $.ui.resolve(e)
   const words = (
@@ -125,7 +153,7 @@ async function buddy($: EngineInterface, e: RenderInput<"Pane" | "AbovePrompt">,
         </Text>
       )}
       {detail !== null && <Text dimColor>{detail}</Text>}
-      <Text dimColor>for {ago(now - a.since)}</Text>
+      <Text dimColor>for {e.surface === "terminal" ? ago(now - a.since) : roughly(now - a.since)}</Text>
     </Box>
   )
 
@@ -139,7 +167,7 @@ async function buddy($: EngineInterface, e: RenderInput<"Pane" | "AbovePrompt">,
     art = <Raster key="buddy" columns={columnsFor(mode, rows)} rows={rows} cells={cells(mode, rows, t)} />
   } else {
     const { Svg } = $.ui.resolve(e)
-    art = <Svg source={svg(mode)} alt={`Claude is ${look.label.toLowerCase()}`} width={Math.round((isSmall ? 110 : 200) * aspect(mode))} height={isSmall ? 110 : 200} />
+    art = <Svg key="buddy" source={svg(mode, now)} alt={`Claude is ${look.label.toLowerCase()}`} width={Math.round((isSmall ? 110 : 200) * aspect(mode))} height={isSmall ? 110 : 200} />
   }
 
   return (
