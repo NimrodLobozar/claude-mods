@@ -32,7 +32,7 @@ claude plugin install work-buddy --marketplace NimrodLobozar/claude-mods
 
 In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `NimrodLobozar/claude-mods`, then Add plugin.
 
-This repository is private: the machine you install on needs a git credential for github.com that can read it, for example `gh auth login` followed by `gh auth setup-git`. The install never prompts for one.
+This repository is public, so anyone can install from it; no GitHub account or login is needed.
 
 ## Changing work-buddy's art
 
